@@ -4,14 +4,14 @@ function padTwoDigits(value) {
 
 function formatLevel(level) {
   if (!level) {
-    return "GLM";
+    return "Kimi";
   }
 
-  return `GLM ${level.charAt(0).toUpperCase()}${level.slice(1)}`;
+  return `Kimi ${level.charAt(0).toUpperCase()}${level.slice(1)}`;
 }
 
 function formatCompactLabel() {
-  return "GLM";
+  return "Kimi";
 }
 
 function formatResetTime(timestampMs) {
@@ -72,7 +72,7 @@ function formatPercentStatus(result, resetTime, displayMode) {
     return `${formatLevel(result.level)} | 5h left ${result.leftPercent}% | reset ${resetTime}`;
   }
 
-  return "GLM | quota unavailable";
+  return "Kimi | quota unavailable";
 }
 
 function formatAbsoluteStatus(result, resetTime, displayMode, style, barWidth) {
@@ -113,25 +113,25 @@ function formatAbsoluteStatus(result, resetTime, displayMode, style, barWidth) {
     return `${formatLevel(result.level)} | 5h left ${result.remaining}/${result.total} | reset ${resetTime}`;
   }
 
-  return "GLM | quota unavailable";
+  return "Kimi | quota unavailable";
 }
 
 export function formatStatus(result, options = {}) {
   if (!result || typeof result !== "object") {
-    return "GLM | quota unavailable";
+    return "Kimi | quota unavailable";
   }
 
   if (result.kind === "auth_error") {
-    return "GLM | auth expired";
+    return "Kimi | auth expired";
   }
 
   if (result.kind !== "success") {
-    return "GLM | quota unavailable";
+    return "Kimi | quota unavailable";
   }
 
   const resetTime = formatResetTime(result.nextResetTime);
   if (!resetTime) {
-    return "GLM | quota unavailable";
+    return "Kimi | quota unavailable";
   }
 
   const style = normalizeStyle(options.style);
@@ -152,5 +152,5 @@ export function formatStatus(result, options = {}) {
     return formatAbsoluteStatus(result, resetTime, options.displayMode, style, options.barWidth);
   }
 
-  return "GLM | quota unavailable";
+  return "Kimi | quota unavailable";
 }

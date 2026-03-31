@@ -1,4 +1,8 @@
 function asFiniteNumber(value) {
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
   return Number.isFinite(value) ? value : null;
 }
 
@@ -7,31 +11,17 @@ function isAuthFailureMessage(value) {
     return false;
   }
 
-  return /authorization|身份验证|鉴权|auth|令牌|token|过期|验证不正确/i.test(value);
+  return /authorization|身份验证|鉴权|auth|令牌|token|过期|验证不正确|invalid|unauthorized/i.test(value);
 }
 
-function computeTotal(limit) {
-  const usage = asFiniteNumber(limit.usage);
-  if (usage !== null && usage >= 0) {
-    return usage;
+function parseResetTime(resetTimeValue) {
+  if (typeof resetTimeValue === "string") {
+    const date = new Date(resetTimeValue);
+    if (!Number.isNaN(date.getTime())) {
+      return date.getTime();
+    }
   }
-
-  const remaining = asFiniteNumber(limit.remaining);
-  const currentValue = asFiniteNumber(limit.currentValue);
-  if (remaining !== null && currentValue !== null) {
-    return remaining + currentValue;
-  }
-
-  return null;
-}
-
-function clampPercent(value) {
-  const percent = asFiniteNumber(value);
-  if (percent === null) {
-    return null;
-  }
-
-  return Math.min(100, Math.max(0, percent));
+  return asFiniteNumber(resetTimeValue);
 }
 
 export function parseQuotaResponse(response) {
@@ -44,55 +34,83 @@ export function parseQuotaResponse(response) {
     return { kind: "unavailable" };
   }
 
-  if (payload.success !== true) {
-    if (payload.code === 1001 || payload.code === 401 || isAuthFailureMessage(payload.msg)) {
+  // Handle error response
+  if (payload.error) {
+    if (payload.error.code === "invalid_auth" ||
+        payload.error.code === "unauthorized" ||
+        isAuthFailureMessage(payload.error.message)) {
       return { kind: "auth_error" };
     }
-
     return { kind: "unavailable" };
   }
 
-  const level = typeof payload.data?.level === "string" ? payload.data.level : "";
-  const limits = Array.isArray(payload.data?.limits) ? payload.data.limits : [];
-  const rollingWindowLimit = limits.find(
-    (limit) => limit?.type === "TOKENS_LIMIT" && limit?.number === 5
-  );
+  // Handle Kimi error format: { code: "unauthenticated", details: [...] }
+  if (payload.code === "unauthenticated" ||
+      payload.code === "unauthorized" ||
+      isAuthFailureMessage(payload.code)) {
+    return { kind: "auth_error" };
+  }
 
-  if (rollingWindowLimit) {
-    const usedPercent = clampPercent(rollingWindowLimit.percentage);
-    const nextResetTime = asFiniteNumber(rollingWindowLimit.nextResetTime);
+  // Handle Kimi GetUsages API response format
+  // { "usages": [{ "scope": "FEATURE_CODING", "detail": { "limit", "used", "remaining", "resetTime" }, "limits": [...] }] }
+  const usages = Array.isArray(payload.usages) ? payload.usages : [];
+  const codingUsage = usages.find(u => u?.scope === "FEATURE_CODING");
 
-    if (usedPercent !== null && nextResetTime !== null) {
+  if (codingUsage && codingUsage.detail && typeof codingUsage.detail === "object") {
+    const detail = codingUsage.detail;
+    const limit = asFiniteNumber(detail.limit);
+    const used = asFiniteNumber(detail.used);
+    const remaining = asFiniteNumber(detail.remaining);
+    const nextResetTime = parseResetTime(detail.resetTime);
+
+    if (limit !== null && used !== null && remaining !== null && nextResetTime !== null) {
+      const leftPercent = limit > 0 ? Math.round((remaining / limit) * 100) : null;
+      const usedPercent = limit > 0 ? Math.round((used / limit) * 100) : null;
+
+      if (leftPercent !== null && usedPercent !== null) {
+        return {
+          kind: "success",
+          level: "",
+          display: "percent",
+          leftPercent,
+          usedPercent,
+          nextResetTime
+        };
+      }
+
       return {
         kind: "success",
-        level,
-        display: "percent",
-        leftPercent: 100 - usedPercent,
-        usedPercent,
+        level: "",
+        display: "absolute",
+        remaining,
+        total: limit,
         nextResetTime
       };
     }
   }
 
-  const timeLimit = limits.find((limit) => limit?.type === "TIME_LIMIT" && limit?.unit === 5);
-  if (!timeLimit) {
-    return { kind: "unavailable" };
+  // Fallback: try limits array if detail is not available
+  if (codingUsage && Array.isArray(codingUsage.limits)) {
+    const windowLimit = codingUsage.limits[0];
+    if (windowLimit && windowLimit.detail && typeof windowLimit.detail === "object") {
+      const detail = windowLimit.detail;
+      const limit = asFiniteNumber(detail.limit);
+      const used = asFiniteNumber(detail.used);
+      const remaining = asFiniteNumber(detail.remaining);
+      const nextResetTime = parseResetTime(detail.resetTime);
+
+      if (limit !== null && remaining !== null && nextResetTime !== null) {
+        return {
+          kind: "success",
+          level: "",
+          display: "absolute",
+          remaining,
+          total: limit,
+          nextResetTime
+        };
+      }
+    }
   }
 
-  const remaining = asFiniteNumber(timeLimit.remaining);
-  const total = computeTotal(timeLimit);
-  const nextResetTime = asFiniteNumber(timeLimit.nextResetTime);
-
-  if (remaining === null || total === null || nextResetTime === null) {
-    return { kind: "unavailable" };
-  }
-
-  return {
-    kind: "success",
-    level,
-    display: "absolute",
-    remaining,
-    total,
-    nextResetTime
-  };
+  return { kind: "unavailable" };
 }

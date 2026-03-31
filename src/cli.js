@@ -14,24 +14,24 @@ import {
 } from "./userConfig.js";
 
 function printHelp() {
-  process.stdout.write(`glm-quota-line
+  process.stdout.write(`kimi-quota-line
 
 Usage:
-  glm-quota-line [--style text|compact|bar] [--display left|used|both]
-  glm-quota-line install [--force]
-  glm-quota-line uninstall
-  glm-quota-line config set style <text|compact|bar>
-  glm-quota-line config set display <left|used|both>
-  glm-quota-line config show
+  kimi-quota-line [--style text|compact|bar] [--display left|used|both]
+  kimi-quota-line install [--force]
+  kimi-quota-line uninstall
+  kimi-quota-line config set style <text|compact|bar>
+  kimi-quota-line config set display <left|used|both>
+  kimi-quota-line config show
 
 Environment:
-  ANTHROPIC_AUTH_TOKEN
+  KIMI_AUTHORIZATION   # Kimi 的 Authorization token (必需)
   ANTHROPIC_BASE_URL
-  GLM_DISPLAY_MODE
-  GLM_STYLE
-  GLM_BAR_WIDTH
-  GLM_TIMEOUT_MS
-  GLM_CACHE_TTL_MS
+  KIMI_DISPLAY_MODE
+  KIMI_STYLE
+  KIMI_BAR_WIDTH
+  KIMI_TIMEOUT_MS
+  KIMI_CACHE_TTL_MS
 `);
 }
 
@@ -52,7 +52,7 @@ async function handleCommand(args) {
     });
     if (!result.installed && result.reason === "unmanaged_exists") {
       process.stdout.write(
-        `Skipped install because Claude Code already has an unmanaged statusLine.\nsettings: ${result.settingsPath}\nRun 'glm-quota-line install --force' to replace it and back it up.\n`
+        `Skipped install because Claude Code already has an unmanaged statusLine.\nsettings: ${result.settingsPath}\nRun 'kimi-quota-line install --force' to replace it and back it up.\n`
       );
       return true;
     }
@@ -72,7 +72,7 @@ async function handleCommand(args) {
 
     if (result.reason === "unmanaged") {
       process.stdout.write(
-        `Skipped uninstall because current statusLine is not managed by glm-quota-line.\nsettings: ${result.settingsPath}\n`
+        `Skipped uninstall because current statusLine is not managed by kimi-quota-line.\nsettings: ${result.settingsPath}\n`
       );
       return true;
     }
@@ -80,7 +80,7 @@ async function handleCommand(args) {
     process.stdout.write(`No Claude Code status line was configured.\nsettings: ${result.settingsPath}\n`);
     return true;
   }
-
+  
   if (command === "config" && subcommand === "show") {
     const config = await readToolConfig();
     process.stdout.write(`${JSON.stringify(config, null, 2)}\n`);
@@ -131,8 +131,11 @@ async function main() {
 
     const statusLineInput = await readStatusLineInput();
     const userConfig = await readToolConfig();
+    
+    // Claude Code passes env vars via statusLineInput.env
+    const envVars = statusLineInput?.env || process.env;
     const config = {
-      ...loadConfig(),
+      ...loadConfig(envVars),
       ...(validateStyle(userConfig.style) ? { style: userConfig.style } : {}),
       ...(validateDisplay(userConfig.displayMode) ? { displayMode: userConfig.displayMode } : {}),
       ...args,
@@ -148,7 +151,7 @@ async function main() {
       })}\n`
     );
   } catch {
-    process.stdout.write("GLM | quota unavailable\n");
+    process.stdout.write("Kimi | quota unavailable\n");
   }
 }
 

@@ -1,7 +1,7 @@
 {
-  "name": "glm-quota-line",
+  "name": "kimi-quota-line",
   "version": "0.1.0",
-  "description": "Claude Code status line helper for GLM Coding Plan quota.",
+  "description": "Claude Code status line helper for Kimi Code usage quota.",
   "type": "module",
   "license": "MIT",
   "author": "caojian",
@@ -9,17 +9,18 @@
   "keywords": [
     "claude-code",
     "statusline",
-    "glm",
+    "kimi",
+    "moonshot",
     "quota",
     "cli"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deluo/glm-quota-line.git"
+    "url": "git+https://github.com/deluo/kimi-quota-line.git"
   },
-  "homepage": "https://github.com/deluo/glm-quota-line#readme",
+  "homepage": "https://github.com/deluo/kimi-quota-line#readme",
   "bugs": {
-    "url": "https://github.com/deluo/glm-quota-line/issues"
+    "url": "https://github.com/deluo/kimi-quota-line/issues"
   },
   "publishConfig": {
     "access": "public"
@@ -32,7 +33,7 @@
     "CHANGELOG.md"
   ],
   "bin": {
-    "glm-quota-line": "./src/cli.js"
+    "kimi-quota-line": "./src/cli.js"
   },
   "scripts": {
     "start": "node ./src/cli.js",
