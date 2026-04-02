@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 
-const DEFAULT_QUOTA_URL = "https://www.kimi.com/apiv2/kimi.gateway.billing.v1.BillingService/GetUsages";
+const DEFAULT_QUOTA_URL = "https://api.kimi.com/coding/v1/usages";
 const DEFAULT_TIMEOUT_MS = 5000;
 const DEFAULT_CACHE_TTL_MS = 300_000;
 const DEFAULT_DISPLAY_MODE = "left";
@@ -36,14 +36,10 @@ function deriveQuotaUrl(baseUrl) {
 
   try {
     const parsedBaseUrl = new URL(baseUrl);
-    const baseDomain = `${parsedBaseUrl.protocol}//${parsedBaseUrl.host}`;
 
-    if (
-      parsedBaseUrl.host.includes("api.moonshot.cn") ||
-      parsedBaseUrl.host.includes("kimi.moonshot.cn") ||
-      parsedBaseUrl.host.includes("kimi.com")
-    ) {
-      return DEFAULT_QUOTA_URL;
+    // Kimi Code platform
+    if (parsedBaseUrl.host.includes("api.kimi.com")) {
+      return `${baseUrl.replace(/\/$/, "")}/usages`;
     }
   } catch {
     return "";
@@ -56,10 +52,13 @@ export function loadConfig(env = process.env) {
   const cacheRoot = getCacheRoot();
   const anthropicBaseUrl = env.ANTHROPIC_BASE_URL || "";
   const derivedQuotaUrl = deriveQuotaUrl(anthropicBaseUrl);
+  
+  // Use ANTHROPIC_AUTH_TOKEN (Claude Code official) as Kimi API Key
+  const apiKey = env.ANTHROPIC_AUTH_TOKEN || env.KIMI_API_KEY || env.KIMI_AUTHORIZATION || "";
 
   return {
     quotaUrl: derivedQuotaUrl || DEFAULT_QUOTA_URL,
-    authorization: env.KIMI_AUTHORIZATION || "",
+    apiKey,
     anthropicBaseUrl,
     timeoutMs: parsePositiveInt(env.KIMI_TIMEOUT_MS, DEFAULT_TIMEOUT_MS),
     cacheTtlMs: parsePositiveInt(env.KIMI_CACHE_TTL_MS, DEFAULT_CACHE_TTL_MS),

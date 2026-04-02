@@ -6,7 +6,7 @@ export async function runQuotaLine(config, options = {}) {
   const now = options.now ?? Date.now();
   const fetchImpl = options.fetchImpl;
 
-  if (!config.authorization) {
+  if (!config.apiKey) {
     return { kind: "auth_error" };
   }
 

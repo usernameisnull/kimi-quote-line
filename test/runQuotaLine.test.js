@@ -19,38 +19,37 @@ import {
   uninstallClaudeStatusLine
 } from "../src/userConfig.js";
 
+// Kimi Code platform response format
+// Using a fixed timestamp that works across timezones for testing
+const TEST_RESET_TIME_MS = 1774939627716; // Fixed timestamp for consistent testing
+const TEST_RESET_ISO = new Date(TEST_RESET_TIME_MS).toISOString();
 const SUCCESS_BODY = {
-  code: 200,
-  msg: "操作成功",
-  data: {
-    limits: [
-      {
-        type: "TOKENS_LIMIT",
-        unit: 3,
-        number: 5,
-        percentage: 9,
-        nextResetTime: 1774939627716
-      },
-      {
-        type: "TIME_LIMIT",
-        unit: 5,
-        number: 1,
-        usage: 100,
-        currentValue: 0,
-        remaining: 100,
-        percentage: 0,
-        nextResetTime: 1777518607977
-      }
-    ],
-    level: "lite"
+  usage: {
+    limit: 1000,
+    used: 90,
+    remaining: 910,
+    reset_at: TEST_RESET_ISO
   },
-  success: true
+  limits: [
+    {
+      detail: {
+        limit: 1000,
+        used: 90,
+        remaining: 910,
+        reset_at: TEST_RESET_ISO
+      },
+      window: {
+        duration: 60,
+        timeUnit: "MINUTE"
+      }
+    }
+  ]
 };
 
-function createConfig(cacheFilePath, authorization = "token", threadId = "thread-1") {
+function createConfig(cacheFilePath, apiKey = "token", threadId = "thread-1") {
   return {
-    quotaUrl: "https://bigmodel.cn/api/monitor/usage/quota/limit",
-    authorization,
+    quotaUrl: "https://api.kimi.com/coding/v1/usages",
+    apiKey,
     timeoutMs: 5000,
     cacheTtlMs: 300_000,
     cacheFilePath,
@@ -89,13 +88,15 @@ test("formats a successful response and writes cache", async () => {
       }
     });
 
+    const expectedResetTime = new Date(TEST_RESET_TIME_MS).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+
     assert.equal(fetchCalls, 1);
     assert.equal(result.kind, "success");
     assert.equal(result.display, "percent");
-    assert.equal(formatStatus(result), "GLM Lite | 5h left 91% | reset 14:47");
-    assert.equal(formatStatus(result, { displayMode: "used" }), "GLM Lite | 5h used 9% | reset 14:47");
-    assert.equal(formatStatus(result, { style: "compact" }), "GLM 91% | 14:47");
-    assert.equal(formatStatus(result, { style: "bar", barWidth: 10 }), "GLM Lite ■□□□□□□□□□ 91% | 14:47");
+    assert.equal(formatStatus(result), `Kimi | 91% left | reset ${expectedResetTime}`);
+    assert.equal(formatStatus(result, { displayMode: "used" }), `Kimi | 9% used | reset ${expectedResetTime}`);
+    assert.equal(formatStatus(result, { style: "compact" }), `Kimi 91% | ${expectedResetTime}`);
+    assert.equal(formatStatus(result, { style: "bar", barWidth: 10 }), `Kimi ■□□□□□□□□□ 91% | ${expectedResetTime}`);
 
     const cached = JSON.parse(await fs.readFile(cacheFilePath, "utf8"));
     assert.equal(cached.result.kind, "success");
@@ -104,7 +105,7 @@ test("formats a successful response and writes cache", async () => {
   });
 });
 
-test("returns auth expired without fetching when Authorization is missing", async () => {
+test("returns auth expired without fetching when API key is missing", async () => {
   await withTempDir(async (dir) => {
     let fetchCalls = 0;
 
@@ -116,7 +117,7 @@ test("returns auth expired without fetching when Authorization is missing", asyn
     });
 
     assert.equal(fetchCalls, 0);
-    assert.equal(formatStatus(result), "GLM | auth expired");
+    assert.equal(formatStatus(result), "Kimi | auth expired");
   });
 });
 
@@ -131,7 +132,7 @@ test("returns fresh cached value without hitting the network", async () => {
           threadId: "thread-1",
           result: {
             kind: "success",
-            level: "lite",
+            level: "",
             display: "percent",
             leftPercent: 88,
             nextResetTime: 1774939627716
@@ -152,7 +153,7 @@ test("returns fresh cached value without hitting the network", async () => {
     });
 
     assert.equal(fetchCalls, 0);
-    assert.equal(formatStatus(result), "GLM Lite | 5h left 88% | reset 14:47");
+    assert.equal(formatStatus(result), "Kimi | 88% left | reset 14:47");
   });
 });
 
@@ -167,7 +168,7 @@ test("falls back to stale cache on unavailable responses", async () => {
           threadId: "thread-1",
           result: {
             kind: "success",
-            level: "lite",
+            level: "",
             display: "percent",
             leftPercent: 77,
             nextResetTime: 1774939627716
@@ -188,7 +189,7 @@ test("falls back to stale cache on unavailable responses", async () => {
       })
     });
 
-    assert.equal(formatStatus(result), "GLM Lite | 5h left 77% | reset 14:47");
+    assert.equal(formatStatus(result), "Kimi | 77% left | reset 14:47");
   });
 });
 
@@ -203,7 +204,7 @@ test("auth failures do not reuse stale cache", async () => {
           threadId: "thread-1",
           result: {
             kind: "success",
-            level: "lite",
+            level: "",
             display: "percent",
             leftPercent: 77,
             nextResetTime: 1774939627716
@@ -218,13 +219,14 @@ test("auth failures do not reuse stale cache", async () => {
       now: 1774936505000,
       fetchImpl: async () =>
         makeJsonResponse({
-          code: 1001,
-          msg: "Header中未收到Authorization参数，无法进行身份验证。",
-          success: false
+          error: {
+            code: "unauthorized",
+            message: "Invalid API key"
+          }
         })
     });
 
-    assert.equal(formatStatus(result), "GLM | auth expired");
+    assert.equal(formatStatus(result), "Kimi | auth expired");
   });
 });
 
@@ -233,58 +235,59 @@ test("invalid tokens are treated as auth failures", async () => {
     const result = await runQuotaLine(createConfig(path.join(dir, "cache.json")), {
       fetchImpl: async () =>
         makeJsonResponse({
-          code: 401,
-          msg: "令牌已过期或验证不正确",
-          success: false
+          code: "unauthenticated",
+          message: "Invalid API key"
         })
     });
 
-    assert.equal(formatStatus(result), "GLM | auth expired");
+    assert.equal(formatStatus(result), "Kimi | auth expired");
   });
 });
 
 test("returns quota unavailable when no cache exists and the response is malformed", async () => {
   await withTempDir(async (dir) => {
     const result = await runQuotaLine(createConfig(path.join(dir, "cache.json")), {
-      fetchImpl: async () => makeJsonResponse({ success: true, data: { limits: [] } })
+      fetchImpl: async () => makeJsonResponse({ limits: [] })
     });
 
-    assert.equal(formatStatus(result), "GLM | quota unavailable");
+    assert.equal(formatStatus(result), "Kimi | quota unavailable");
   });
 });
 
-test("falls back to TIME_LIMIT absolute display when rolling-window data is missing", async () => {
+test("falls back to limits array when usage object is missing", async () => {
   await withTempDir(async (dir) => {
+    const resetTimeMs = 1775022600000;
+    const resetIso = new Date(resetTimeMs).toISOString();
     const result = await runQuotaLine(createConfig(path.join(dir, "cache.json")), {
       fetchImpl: async () =>
         makeJsonResponse({
-          code: 200,
-          msg: "操作成功",
-          success: true,
-          data: {
-            level: "lite",
-            limits: [
-              {
-                type: "TIME_LIMIT",
-                unit: 5,
-                usage: 100,
-                currentValue: 10,
+          limits: [
+            {
+              detail: {
+                limit: 100,
+                used: 10,
                 remaining: 90,
-                nextResetTime: 1777518607977
+                reset_at: resetIso
+              },
+              window: {
+                duration: 24,
+                timeUnit: "HOUR"
               }
-            ]
-          }
+            }
+          ]
         })
     });
 
-    assert.equal(result.display, "absolute");
-    assert.equal(formatStatus(result), "GLM Lite | 5h left 90/100 | reset 11:10");
+    const expectedResetTime = new Date(resetTimeMs).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+
+    assert.equal(result.display, "percent");
+    assert.equal(formatStatus(result), `Kimi | 90% left | reset ${expectedResetTime}`);
     assert.equal(
       formatStatus(result, { displayMode: "used" }),
-      "GLM Lite | 5h used 10/100 | reset 11:10"
+      `Kimi | 10% used | reset ${expectedResetTime}`
     );
-    assert.equal(formatStatus(result, { style: "compact" }), "GLM 90% | 11:10");
-    assert.equal(formatStatus(result, { style: "bar", barWidth: 10 }), "GLM Lite ■□□□□□□□□□ 90% | 11:10");
+    assert.equal(formatStatus(result, { style: "compact" }), `Kimi 90% | ${expectedResetTime}`);
+    assert.equal(formatStatus(result, { style: "bar", barWidth: 10 }), `Kimi ■□□□□□□□□□ 90% | ${expectedResetTime}`);
   });
 });
 
@@ -301,13 +304,13 @@ test("parses CLI args for style and display", () => {
 
 test("official environment variables take priority and derive the quota URL", () => {
   const config = loadConfig({
-    ANTHROPIC_AUTH_TOKEN: "official-token",
-    ANTHROPIC_BASE_URL: "https://open.bigmodel.cn/api/anthropic",
+    ANTHROPIC_AUTH_TOKEN: "sk-test-key",
+    ANTHROPIC_BASE_URL: "https://api.kimi.com/coding/v1",
     CODEX_THREAD_ID: "thread-9"
   });
 
-  assert.equal(config.authorization, "official-token");
-  assert.equal(config.quotaUrl, "https://open.bigmodel.cn/api/monitor/usage/quota/limit");
+  assert.equal(config.apiKey, "sk-test-key");
+  assert.equal(config.quotaUrl, "https://api.kimi.com/coding/v1/usages");
   assert.equal(config.cacheTtlMs, 300_000);
   assert.equal(config.threadId, "thread-9");
 });
@@ -323,7 +326,7 @@ test("same thread and fresh cache do not trigger a network request", async () =>
           threadId: "thread-1",
           result: {
             kind: "success",
-            level: "lite",
+            level: "",
             display: "percent",
             leftPercent: 88,
             usedPercent: 12,
@@ -345,7 +348,7 @@ test("same thread and fresh cache do not trigger a network request", async () =>
     });
 
     assert.equal(fetchCalls, 0);
-    assert.equal(formatStatus(result), "GLM Lite | 5h left 88% | reset 14:47");
+    assert.equal(formatStatus(result), "Kimi | 88% left | reset 14:47");
   });
 });
 
@@ -360,11 +363,11 @@ test("a different thread id forces a refresh even when cache is fresh", async ()
           threadId: "thread-old",
           result: {
             kind: "success",
-            level: "lite",
+            level: "",
             display: "percent",
             leftPercent: 88,
             usedPercent: 12,
-            nextResetTime: 1774939627716
+            nextResetTime: TEST_RESET_TIME_MS
           }
         },
         null,
@@ -381,8 +384,10 @@ test("a different thread id forces a refresh even when cache is fresh", async ()
       }
     });
 
+    const expectedResetTime = new Date(TEST_RESET_TIME_MS).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+
     assert.equal(fetchCalls, 1);
-    assert.equal(formatStatus(result), "GLM Lite | 5h left 91% | reset 14:47");
+    assert.equal(formatStatus(result), `Kimi | 91% left | reset ${expectedResetTime}`);
   });
 });
 
@@ -416,27 +421,28 @@ test("falls back to CODEX_THREAD_ID when Claude session metadata is absent", () 
 test("bar style uses filled cells for used percentage and spaces for unused percentage", () => {
   const result = {
     kind: "success",
-    level: "lite",
+    level: "",
     display: "percent",
     leftPercent: 97,
     usedPercent: 3,
     nextResetTime: 1774939627716
   };
 
-  assert.equal(formatStatus(result, { style: "bar", barWidth: 10 }), "GLM Lite ■□□□□□□□□□ 97% | 14:47");
+  // 3% used with barWidth 10 = 1 filled cell (3% of 10 = 0.3, min 1)
+  assert.equal(formatStatus(result, { style: "bar", barWidth: 10 }), "Kimi ■□□□□□□□□□ 97% | 14:47");
 });
 
 test("bar style fills completely only when used percentage reaches 100", () => {
   const result = {
     kind: "success",
-    level: "lite",
+    level: "",
     display: "percent",
     leftPercent: 0,
     usedPercent: 100,
     nextResetTime: 1774939627716
   };
 
-  assert.equal(formatStatus(result, { style: "bar", barWidth: 10 }), "GLM Lite ■■■■■■■■■■ 0% | 14:47");
+  assert.equal(formatStatus(result, { style: "bar", barWidth: 10 }), "Kimi ■■■■■■■■■■ 0% | 14:47");
 });
 
 test("writes tool config values for style and display", async () => {

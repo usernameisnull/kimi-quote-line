@@ -5,13 +5,11 @@ export async function fetchQuota(config, fetchImpl = globalThis.fetch) {
 
   try {
     const response = await fetchImpl(config.quotaUrl, {
-      method: "POST",
+      method: "GET",
       headers: {
-        Accept: "*/*",
-        "content-type": "application/json",
-        authorization: config.authorization
+        Accept: "application/json",
+        Authorization: `Bearer ${config.apiKey}`
       },
-      body: JSON.stringify({ scope: ["FEATURE_CODING"] }),
       signal: AbortSignal.timeout(config.timeoutMs)
     });
 

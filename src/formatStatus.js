@@ -57,7 +57,7 @@ function formatPercentStatus(result, resetTime, displayMode) {
   const mode = normalizeDisplayMode(displayMode);
 
   if (mode === "used" && Number.isFinite(result.usedPercent)) {
-    return `${formatLevel(result.level)} | 5h used ${result.usedPercent}% | reset ${resetTime}`;
+    return `${formatLevel(result.level)} | ${result.usedPercent}% used | reset ${resetTime}`;
   }
 
   if (
@@ -65,11 +65,11 @@ function formatPercentStatus(result, resetTime, displayMode) {
     Number.isFinite(result.leftPercent) &&
     Number.isFinite(result.usedPercent)
   ) {
-    return `${formatLevel(result.level)} | 5h left ${result.leftPercent}% used ${result.usedPercent}% | reset ${resetTime}`;
+    return `${formatLevel(result.level)} | ${result.leftPercent}% left ${result.usedPercent}% used | reset ${resetTime}`;
   }
 
   if (Number.isFinite(result.leftPercent)) {
-    return `${formatLevel(result.level)} | 5h left ${result.leftPercent}% | reset ${resetTime}`;
+    return `${formatLevel(result.level)} | ${result.leftPercent}% left | reset ${resetTime}`;
   }
 
   return "Kimi | quota unavailable";
@@ -97,7 +97,7 @@ function formatAbsoluteStatus(result, resetTime, displayMode, style, barWidth) {
   }
 
   if (mode === "used" && Number.isFinite(usedValue) && Number.isFinite(result.total)) {
-    return `${formatLevel(result.level)} | 5h used ${usedValue}/${result.total} | reset ${resetTime}`;
+    return `${formatLevel(result.level)} | used ${usedValue}/${result.total} | reset ${resetTime}`;
   }
 
   if (
@@ -106,11 +106,11 @@ function formatAbsoluteStatus(result, resetTime, displayMode, style, barWidth) {
     Number.isFinite(result.total) &&
     Number.isFinite(usedValue)
   ) {
-    return `${formatLevel(result.level)} | 5h left ${result.remaining}/${result.total} used ${usedValue}/${result.total} | reset ${resetTime}`;
+    return `${formatLevel(result.level)} | left ${result.remaining}/${result.total} used ${usedValue}/${result.total} | reset ${resetTime}`;
   }
 
   if (Number.isFinite(result.remaining) && Number.isFinite(result.total)) {
-    return `${formatLevel(result.level)} | 5h left ${result.remaining}/${result.total} | reset ${resetTime}`;
+    return `${formatLevel(result.level)} | left ${result.remaining}/${result.total} | reset ${resetTime}`;
   }
 
   return "Kimi | quota unavailable";

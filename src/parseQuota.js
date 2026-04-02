@@ -51,66 +51,93 @@ export function parseQuotaResponse(response) {
     return { kind: "auth_error" };
   }
 
-  // Handle Kimi GetUsages API response format
-  // { "usages": [{ "scope": "FEATURE_CODING", "detail": { "limit", "used", "remaining", "resetTime" }, "limits": [...] }] }
+  // Kimi Code platform format: { "usage": {...}, "limits": [...] }
+  // Try usage object first (summary)
+  const usage = payload.usage;
+  if (usage && typeof usage === "object") {
+    const result = parseUsageDetail(usage);
+    if (result) {
+      return result;
+    }
+  }
+
+  // Fallback: try limits array
+  const limits = Array.isArray(payload.limits) ? payload.limits : [];
+  if (limits.length > 0) {
+    // Find the first limit with a detail object
+    for (const limit of limits) {
+      if (limit && limit.detail && typeof limit.detail === "object") {
+        const result = parseUsageDetail(limit.detail);
+        if (result) {
+          return result;
+        }
+      }
+    }
+  }
+
+  // Legacy format: { "usages": [{ "scope": "FEATURE_CODING", "detail": {...} }] }
   const usages = Array.isArray(payload.usages) ? payload.usages : [];
   const codingUsage = usages.find(u => u?.scope === "FEATURE_CODING");
 
   if (codingUsage && codingUsage.detail && typeof codingUsage.detail === "object") {
-    const detail = codingUsage.detail;
-    const limit = asFiniteNumber(detail.limit);
-    const used = asFiniteNumber(detail.used);
-    const remaining = asFiniteNumber(detail.remaining);
-    const nextResetTime = parseResetTime(detail.resetTime);
-
-    if (limit !== null && used !== null && remaining !== null && nextResetTime !== null) {
-      const leftPercent = limit > 0 ? Math.round((remaining / limit) * 100) : null;
-      const usedPercent = limit > 0 ? Math.round((used / limit) * 100) : null;
-
-      if (leftPercent !== null && usedPercent !== null) {
-        return {
-          kind: "success",
-          level: "",
-          display: "percent",
-          leftPercent,
-          usedPercent,
-          nextResetTime
-        };
-      }
-
-      return {
-        kind: "success",
-        level: "",
-        display: "absolute",
-        remaining,
-        total: limit,
-        nextResetTime
-      };
+    const result = parseUsageDetail(codingUsage.detail);
+    if (result) {
+      return result;
     }
   }
 
-  // Fallback: try limits array if detail is not available
+  // Fallback: try limits array in legacy format
   if (codingUsage && Array.isArray(codingUsage.limits)) {
     const windowLimit = codingUsage.limits[0];
     if (windowLimit && windowLimit.detail && typeof windowLimit.detail === "object") {
-      const detail = windowLimit.detail;
-      const limit = asFiniteNumber(detail.limit);
-      const used = asFiniteNumber(detail.used);
-      const remaining = asFiniteNumber(detail.remaining);
-      const nextResetTime = parseResetTime(detail.resetTime);
-
-      if (limit !== null && remaining !== null && nextResetTime !== null) {
-        return {
-          kind: "success",
-          level: "",
-          display: "absolute",
-          remaining,
-          total: limit,
-          nextResetTime
-        };
+      const result = parseUsageDetail(windowLimit.detail);
+      if (result) {
+        return result;
       }
     }
   }
 
   return { kind: "unavailable" };
+}
+
+function parseUsageDetail(detail) {
+  // Support both snake_case and camelCase field names
+  const limit = asFiniteNumber(detail.limit);
+  const used = asFiniteNumber(detail.used);
+  const remaining = asFiniteNumber(detail.remaining);
+  
+  // Support multiple reset time field names
+  const nextResetTime = parseResetTime(
+    detail.reset_at || 
+    detail.resetAt || 
+    detail.reset_time || 
+    detail.resetTime
+  );
+
+  if (limit !== null && used !== null && remaining !== null && nextResetTime !== null) {
+    const leftPercent = limit > 0 ? Math.round((remaining / limit) * 100) : null;
+    const usedPercent = limit > 0 ? Math.round((used / limit) * 100) : null;
+
+    if (leftPercent !== null && usedPercent !== null) {
+      return {
+        kind: "success",
+        level: "",
+        display: "percent",
+        leftPercent,
+        usedPercent,
+        nextResetTime
+      };
+    }
+
+    return {
+      kind: "success",
+      level: "",
+      display: "absolute",
+      remaining,
+      total: limit,
+      nextResetTime
+    };
+  }
+
+  return null;
 }

@@ -1,6 +1,6 @@
 # kimi-quota-line
 
-本项目 fork 自 `https://github.com/deluo/glm-quota-line` 并修改以支持 kimi，用于在 Claude Code 中显示使用量配额状态。
+本项目借鉴自 `https://github.com/deluo/glm-quota-line` 并修改以支持 kimi，用于在 Claude Code 中显示使用量配额状态。
 
 `kimi-quota-line` 是一个给 Claude Code 底部状态栏使用的轻量 CLI，用来显示 Moonshot Kimi Code 的使用配额状态。
 
@@ -93,11 +93,32 @@ kimi-quota-line uninstall
 
 必需：
 
-- `KIMI_AUTHORIZATION` - Kimi 的 Authorization token (从浏览器开发者工具获取)
+- `ANTHROPIC_AUTH_TOKEN` - Claude Code 官方环境变量，设置为你的 Kimi Code API Key, 如果你的Claude Code接入的时候就是通过ANTHROPIC_AUTH_TOKEN环境变量设置的则不需要重复设置,比如: 
+```powershell
+function claude-kimi {
+    $env:ANTHROPIC_BASE_URL="https://api.kimi.com/coding/"
+    $env:ANTHROPIC_AUTH_TOKEN="sk-kimi-your api key"
+    $env:ANTHROPIC_MODEL="kimi-k2.5"
+    $env:ANTHROPIC_DEFAULT_OPUS_MODEL="kimi-k2.5"
+    $env:ANTHROPIC_DEFAULT_SONNET_MODEL="kimi-k2.5"
+    $env:ANTHROPIC_DEFAULT_HAIKU_MODEL="kimi-k2.5"
+    $env:CLAUDE_CODE_SUBAGENT_MODEL="kimi-k2.5"
+    $env:ENABLE_TOOL_SEARCH="false"
 
+    claude @args
+}
+```
 可选：
 
-- `ANTHROPIC_BASE_URL`
+- `ANTHROPIC_BASE_URL` - 设置为 `https://api.kimi.com/coding/v1` (Kimi Code 平台)
+- `KIMI_API_KEY` - 备选方式，与 `ANTHROPIC_AUTH_TOKEN` 作用相同
+
+## 获取 API Key
+
+1. 访问 [Kimi Code](https://kimi.com)
+2. 进入设置页面
+3. 找到 API Key 管理，创建新的 API Key
+4. 将 API Key 设置为环境变量：`export KIMI_API_KEY="your-api-key"`
 
 ## 说明
 
@@ -106,3 +127,4 @@ kimi-quota-line uninstall
 - 接口异常时显示 `Kimi | quota unavailable`
 - `install` 默认不会覆盖已有的非本工具 `statusLine`
 - `install --force` 会覆盖并备份原配置，`uninstall` 时可恢复
+- 支持 Kimi Code 平台 API (`https://api.kimi.com/coding/v1`)
