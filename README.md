@@ -1,67 +1,69 @@
 # kimi-quota-line
 
-本项目借鉴自 `https://github.com/deluo/glm-quota-line` 并修改以支持 kimi，用于在 Claude Code 中显示使用量配额状态。
+English | [中文文档](README.zh-CN.md)
 
-`kimi-quota-line` 是一个给 Claude Code 底部状态栏使用的轻量 CLI，用来显示 Moonshot Kimi Code 的使用配额状态。
+A lightweight CLI for Claude Code status bar to display Moonshot Kimi Code usage quota.
 
-它会读取配额接口、缓存成功结果，并输出一行适合状态栏展示的短文本。
+Inspired by [glm-quota-line](https://github.com/deluo/glm-quota-line), modified to support Kimi.
 
-## 功能
+It fetches the quota API, caches successful results, and outputs a single line suitable for display in the status bar.
 
-- 适配 Claude Code `statusLine.command`
-- 通过请求 header 中的 authorization 获取 Kimi 登录凭证
-- 新会话首次强制刷新，之后 5 分钟内走缓存
-- 支持 `text`、`compact`、`bar` 三种样式
-- 支持自动安装和卸载 Claude Code 的状态栏配置
+## Features
 
-## 展示效果
+- Compatible with Claude Code `statusLine.command`
+- Uses API Key for Kimi authentication (via `ANTHROPIC_AUTH_TOKEN`)
+- Force refresh on first session, then cache for 5 minutes
+- Supports three styles: `text`, `compact`, and `bar`
+- Auto-install and uninstall Claude Code status bar configuration
 
-`text`
+## Display Styles
 
-```text
-Kimi | 5h left 91% | reset 14:47
-```
-
-`compact`
-
-```text
-Kimi 91% | 14:47
-```
-
-`bar`
+### `bar` (Default)
 
 ```text
 Kimi ■□□□□□□□□□ 91% | 14:47
 ```
 
-说明：
+### `text`
 
-- `■` 表示已用
-- `□` 表示未用
+```text
+Kimi | 91% left | reset 14:47
+```
 
-## 安装
+### `compact`
 
-本地仓库安装：
+```text
+Kimi 91% | 14:47
+```
+
+Legend:
+
+- `■` = Used
+- `□` = Remaining
+
+## Installation
+
+Install from local repository:
 
 ```bash
 npm install -g .
 ```
 
-npm 发布后安装：
+Or install from npm (when published):
 
 ```bash
 npm install -g kimi-quota-line
 ```
 
-## 使用
+## Usage
 
-安装 Claude Code 状态栏：
+Install Claude Code status bar:
 
 ```bash
 kimi-quota-line install
 ```
 
-切换样式(默认为 `bar`)：
+Switch styles (default is `bar`):
 
 ```bash
 kimi-quota-line config set style text
@@ -69,59 +71,60 @@ kimi-quota-line config set style compact
 kimi-quota-line config set style bar
 ```
 
-切换显示模式：
+Switch display modes:
 
 ```bash
-kimi-quota-line config set display left
-kimi-quota-line config set display used
-kimi-quota-line config set display both
+kimi-quota-line config set display left    # Show remaining percentage
+kimi-quota-line config set display used    # Show used percentage
+kimi-quota-line config set display both    # Show both
 ```
 
-查看当前配置：
+View current configuration:
 
 ```bash
 kimi-quota-line config show
 ```
 
-卸载状态栏：
+Uninstall status bar:
 
 ```bash
 kimi-quota-line uninstall
 ```
 
-## 环境变量
+## Environment Variables
 
-必需：
+Required:
 
-- `ANTHROPIC_AUTH_TOKEN` - Claude Code 官方环境变量，设置为你的 Kimi Code API Key, 如果你的Claude Code接入的时候就是通过ANTHROPIC_AUTH_TOKEN环境变量设置的则不需要重复设置,比如: 
-    ```powershell
-    export ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
-    export ANTHROPIC_AUTH_TOKEN=sk-kimi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    export ANTHROPIC_MODEL="kimi-k2.5"
-    export ANTHROPIC_DEFAULT_OPUS_MODEL="kimi-k2.5"
-    export ANTHROPIC_DEFAULT_SONNET_MODEL="kimi-k2.5"
-    export ANTHROPIC_DEFAULT_HAIKU_MODEL="kimi-k2.5"
-    export CLAUDE_CODE_SUBAGENT_MODEL="kimi-k2.5"
-    export ENABLE_TOOL_SEARCH="false"
-    claude
-    ```
-可选：
+- `ANTHROPIC_AUTH_TOKEN` - Claude Code official environment variable. Set this to your Kimi Code API Key. If you already configured Claude Code with this variable, no additional setup is needed:
+  ```bash
+  export ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
+  export ANTHROPIC_AUTH_TOKEN=sk-your-kimi-api-key
+  export ANTHROPIC_MODEL="kimi-k2.5"
+  export ANTHROPIC_DEFAULT_OPUS_MODEL="kimi-k2.5"
+  export ANTHROPIC_DEFAULT_SONNET_MODEL="kimi-k2.5"
+  export ANTHROPIC_DEFAULT_HAIKU_MODEL="kimi-k2.5"
+  export CLAUDE_CODE_SUBAGENT_MODEL="kimi-k2.5"
+  export ENABLE_TOOL_SEARCH="false"
+  claude
+  ```
 
-- `ANTHROPIC_BASE_URL` - 设置为 `https://api.kimi.com/coding/v1` (Kimi Code 平台)
-- `KIMI_API_KEY` - 备选方式，与 `ANTHROPIC_AUTH_TOKEN` 作用相同
+Optional:
 
-## 获取 API Key
+- `ANTHROPIC_BASE_URL` - Set to `https://api.kimi.com/coding/v1` for Kimi Code platform
+- `KIMI_API_KEY` - Alternative way, same as `ANTHROPIC_AUTH_TOKEN`
 
-1. 访问 [Kimi Code](https://kimi.com)
-2. 进入设置页面
-3. 找到 API Key 管理，创建新的 API Key
-4. 将 API Key 设置为环境变量：`export KIMI_API_KEY="your-api-key"`
+## Getting API Key
 
-## 说明
+1. Visit [Kimi Code](https://kimi.com)
+2. Go to Settings
+3. Find API Key management and create a new API Key
+4. Set it as environment variable: `export ANTHROPIC_AUTH_TOKEN="your-api-key"`
 
-- 默认只显示一行文本，适合底部状态栏
-- 鉴权失效时显示 `Kimi | auth expired`
-- 接口异常时显示 `Kimi | quota unavailable`
-- `install` 默认不会覆盖已有的非本工具 `statusLine`
-- `install --force` 会覆盖并备份原配置，`uninstall` 时可恢复
-- 支持 Kimi Code 平台 API (`https://api.kimi.com/coding/v1`)
+## Notes
+
+- Displays a single line by default, suitable for bottom status bar
+- Shows `Kimi | auth expired` when authentication fails
+- Shows `Kimi | quota unavailable` when API is unavailable
+- `install` won't overwrite existing non-tool `statusLine` by default
+- `install --force` overwrites and backs up original config, `uninstall` can restore it
+- Supports Kimi Code platform API (`https://api.kimi.com/coding/v1`)
