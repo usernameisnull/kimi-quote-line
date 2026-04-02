@@ -61,7 +61,7 @@ npm install -g kimi-quota-line
 kimi-quota-line install
 ```
 
-切换样式：
+切换样式(默认为 `bar`)：
 
 ```bash
 kimi-quota-line config set style text
@@ -94,20 +94,17 @@ kimi-quota-line uninstall
 必需：
 
 - `ANTHROPIC_AUTH_TOKEN` - Claude Code 官方环境变量，设置为你的 Kimi Code API Key, 如果你的Claude Code接入的时候就是通过ANTHROPIC_AUTH_TOKEN环境变量设置的则不需要重复设置,比如: 
-```powershell
-function claude-kimi {
-    $env:ANTHROPIC_BASE_URL="https://api.kimi.com/coding/"
-    $env:ANTHROPIC_AUTH_TOKEN="sk-kimi-your api key"
-    $env:ANTHROPIC_MODEL="kimi-k2.5"
-    $env:ANTHROPIC_DEFAULT_OPUS_MODEL="kimi-k2.5"
-    $env:ANTHROPIC_DEFAULT_SONNET_MODEL="kimi-k2.5"
-    $env:ANTHROPIC_DEFAULT_HAIKU_MODEL="kimi-k2.5"
-    $env:CLAUDE_CODE_SUBAGENT_MODEL="kimi-k2.5"
-    $env:ENABLE_TOOL_SEARCH="false"
-
-    claude @args
-}
-```
+    ```powershell
+    export ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
+    export ANTHROPIC_AUTH_TOKEN=sk-kimi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    export ANTHROPIC_MODEL="kimi-k2.5"
+    export ANTHROPIC_DEFAULT_OPUS_MODEL="kimi-k2.5"
+    export ANTHROPIC_DEFAULT_SONNET_MODEL="kimi-k2.5"
+    export ANTHROPIC_DEFAULT_HAIKU_MODEL="kimi-k2.5"
+    export CLAUDE_CODE_SUBAGENT_MODEL="kimi-k2.5"
+    export ENABLE_TOOL_SEARCH="false"
+    claude
+    ```
 可选：
 
 - `ANTHROPIC_BASE_URL` - 设置为 `https://api.kimi.com/coding/v1` (Kimi Code 平台)

@@ -5,7 +5,7 @@ const DEFAULT_QUOTA_URL = "https://api.kimi.com/coding/v1/usages";
 const DEFAULT_TIMEOUT_MS = 5000;
 const DEFAULT_CACHE_TTL_MS = 300_000;
 const DEFAULT_DISPLAY_MODE = "left";
-const DEFAULT_STYLE = "text";
+const DEFAULT_STYLE = "bar";
 const DEFAULT_BAR_WIDTH = 10;
 
 function parsePositiveInt(value, fallback) {
