@@ -34,7 +34,7 @@
     "CHANGELOG.md"
   ],
   "bin": {
-    "kimi-quota-line": "./src/cli.js"
+    "kimi-quota-line": "src/cli.js"
   },
   "scripts": {
     "start": "node ./src/cli.js",
