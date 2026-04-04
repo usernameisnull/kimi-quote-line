@@ -23,6 +23,19 @@ function formatResetTime(timestampMs) {
   return `${padTwoDigits(date.getHours())}:${padTwoDigits(date.getMinutes())}`;
 }
 
+function formatResetTimeWithDate(timestampMs) {
+  const date = new Date(timestampMs);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const hours = padTwoDigits(date.getHours());
+  const minutes = padTwoDigits(date.getMinutes());
+  return `${month}/${day} ${hours}:${minutes}`;
+}
+
 function normalizeDisplayMode(displayMode) {
   return displayMode === "used" || displayMode === "both" ? displayMode : "left";
 }
@@ -116,6 +129,57 @@ function formatAbsoluteStatus(result, resetTime, displayMode, style, barWidth) {
   return "Kimi | quota unavailable";
 }
 
+function formatMultiQuotaStatus(quotas, options, style) {
+  const barWidth = normalizeBarWidth(options.barWidth);
+
+  if (style === "bar") {
+    const parts = quotas.map(quota => {
+      const resetTime = formatResetTimeWithDate(quota.nextResetTime);
+      if (!resetTime || !Number.isFinite(quota.leftPercent) || !Number.isFinite(quota.usedPercent)) {
+        return null;
+      }
+      return `${buildBar(quota.usedPercent, barWidth)} ${quota.leftPercent}% ${resetTime}`;
+    }).filter(Boolean);
+
+    if (parts.length === 0) {
+      return "Kimi | quota unavailable";
+    }
+
+    return `Kimi ${parts.join(" || ")}`;
+  }
+
+  if (style === "compact") {
+    const parts = quotas.map(quota => {
+      const resetTime = formatResetTime(quota.nextResetTime);
+      if (!resetTime || !Number.isFinite(quota.leftPercent)) {
+        return null;
+      }
+      return `${quota.leftPercent}% ${resetTime}`;
+    }).filter(Boolean);
+
+    if (parts.length === 0) {
+      return "Kimi | quota unavailable";
+    }
+
+    return `Kimi ${parts.join(" | ")}`;
+  }
+
+  // text style
+  const parts = quotas.map(quota => {
+    const resetTime = formatResetTimeWithDate(quota.nextResetTime);
+    if (!resetTime || !Number.isFinite(quota.leftPercent)) {
+      return null;
+    }
+    return `${quota.leftPercent}% left ${resetTime}`;
+  }).filter(Boolean);
+
+  if (parts.length === 0) {
+    return "Kimi | quota unavailable";
+  }
+
+  return `Kimi | ${parts.join(" || ")}`;
+}
+
 export function formatStatus(result, options = {}) {
   if (!result || typeof result !== "object") {
     return "Kimi | quota unavailable";
@@ -129,23 +193,31 @@ export function formatStatus(result, options = {}) {
     return "Kimi | quota unavailable";
   }
 
-  const resetTime = formatResetTime(result.nextResetTime);
-  if (!resetTime) {
+  const style = normalizeStyle(options.style);
+
+  // Handle new multi-quota format
+  if (result.quotas && Array.isArray(result.quotas)) {
+    return formatMultiQuotaStatus(result.quotas, options, style);
+  }
+
+  // Handle legacy single-quota format
+  // Use date format for consistency with new format
+  const resetTimeWithDate = formatResetTimeWithDate(result.nextResetTime);
+  const resetTimeOnly = formatResetTime(result.nextResetTime);
+  if (!resetTimeWithDate) {
     return "Kimi | quota unavailable";
   }
 
-  const style = normalizeStyle(options.style);
-
   if (result.display === "percent") {
     if (style === "compact" && Number.isFinite(result.leftPercent)) {
-      return `${formatCompactLabel()} ${result.leftPercent}% | ${resetTime}`;
+      return `${formatCompactLabel()} ${result.leftPercent}% ${resetTimeOnly}`;
     }
 
     if (style === "bar" && Number.isFinite(result.leftPercent) && Number.isFinite(result.usedPercent)) {
-      return `${formatLevel(result.level)} ${buildBar(result.usedPercent, options.barWidth)} ${result.leftPercent}% | ${resetTime}`;
+      return `${formatLevel(result.level)} ${buildBar(result.usedPercent, options.barWidth)} ${result.leftPercent}% ${resetTimeWithDate}`;
     }
 
-    return formatPercentStatus(result, resetTime, options.displayMode);
+    return `${formatLevel(result.level)} | ${result.leftPercent}% left ${resetTimeWithDate}`;
   }
 
   if (result.display === "absolute") {

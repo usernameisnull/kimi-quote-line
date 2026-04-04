@@ -51,50 +51,64 @@ export function parseQuotaResponse(response) {
     return { kind: "auth_error" };
   }
 
-  // Kimi Code platform format: { "usage": {...}, "limits": [...] }
-  // Try usage object first (summary)
-  const usage = payload.usage;
-  if (usage && typeof usage === "object") {
-    const result = parseUsageDetail(usage);
-    if (result) {
-      return result;
+  const quotas = [];
+
+  // Legacy format: { "usages": [{ "scope": "FEATURE_CODING", "detail": {...}, "limits": [...] }] }
+  // This format contains TWO quotas: usages[0].detail (weekly) and usages[0].limits[0].detail (window)
+  const usages = Array.isArray(payload.usages) ? payload.usages : [];
+  const codingUsage = usages.find(u => u?.scope === "FEATURE_CODING");
+
+  // Parse weekly quota from usages[0].detail
+  if (codingUsage && codingUsage.detail && typeof codingUsage.detail === "object") {
+    const weeklyQuota = parseUsageDetail(codingUsage.detail);
+    if (weeklyQuota) {
+      quotas.push(weeklyQuota);
     }
   }
 
-  // Fallback: try limits array
-  const limits = Array.isArray(payload.limits) ? payload.limits : [];
-  if (limits.length > 0) {
-    // Find the first limit with a detail object
-    for (const limit of limits) {
-      if (limit && limit.detail && typeof limit.detail === "object") {
-        const result = parseUsageDetail(limit.detail);
-        if (result) {
-          return result;
+  // Parse window quota from usages[0].limits[0].detail
+  if (codingUsage && Array.isArray(codingUsage.limits) && codingUsage.limits.length > 0) {
+    const windowLimit = codingUsage.limits[0];
+    if (windowLimit && windowLimit.detail && typeof windowLimit.detail === "object") {
+      const windowQuota = parseUsageDetail(windowLimit.detail);
+      if (windowQuota) {
+        quotas.push(windowQuota);
+      }
+    }
+  }
+
+  // Kimi Code platform format: { "usage": {...}, "limits": [...] }
+  // Also try to extract from usage and limits at the root level
+  if (quotas.length === 0) {
+    // Parse weekly quota from usage object
+    const usage = payload.usage;
+    if (usage && typeof usage === "object") {
+      const weeklyQuota = parseUsageDetail(usage);
+      if (weeklyQuota) {
+        quotas.push(weeklyQuota);
+      }
+    }
+
+    // Parse window quota from limits array
+    const limits = Array.isArray(payload.limits) ? payload.limits : [];
+    if (limits.length > 0) {
+      const windowLimit = limits[0];
+      if (windowLimit && windowLimit.detail && typeof windowLimit.detail === "object") {
+        const windowQuota = parseUsageDetail(windowLimit.detail);
+        if (windowQuota) {
+          quotas.push(windowQuota);
         }
       }
     }
   }
 
-  // Legacy format: { "usages": [{ "scope": "FEATURE_CODING", "detail": {...} }] }
-  const usages = Array.isArray(payload.usages) ? payload.usages : [];
-  const codingUsage = usages.find(u => u?.scope === "FEATURE_CODING");
-
-  if (codingUsage && codingUsage.detail && typeof codingUsage.detail === "object") {
-    const result = parseUsageDetail(codingUsage.detail);
-    if (result) {
-      return result;
-    }
-  }
-
-  // Fallback: try limits array in legacy format
-  if (codingUsage && Array.isArray(codingUsage.limits)) {
-    const windowLimit = codingUsage.limits[0];
-    if (windowLimit && windowLimit.detail && typeof windowLimit.detail === "object") {
-      const result = parseUsageDetail(windowLimit.detail);
-      if (result) {
-        return result;
-      }
-    }
+  if (quotas.length > 0) {
+    return {
+      kind: "success",
+      level: "",
+      display: "percent",
+      quotas
+    };
   }
 
   return { kind: "unavailable" };
@@ -105,12 +119,12 @@ function parseUsageDetail(detail) {
   const limit = asFiniteNumber(detail.limit);
   const used = asFiniteNumber(detail.used);
   const remaining = asFiniteNumber(detail.remaining);
-  
+
   // Support multiple reset time field names
   const nextResetTime = parseResetTime(
-    detail.reset_at || 
-    detail.resetAt || 
-    detail.reset_time || 
+    detail.reset_at ||
+    detail.resetAt ||
+    detail.reset_time ||
     detail.resetTime
   );
 
@@ -118,23 +132,9 @@ function parseUsageDetail(detail) {
     const leftPercent = limit > 0 ? Math.round((remaining / limit) * 100) : null;
     const usedPercent = limit > 0 ? Math.round((used / limit) * 100) : null;
 
-    if (leftPercent !== null && usedPercent !== null) {
-      return {
-        kind: "success",
-        level: "",
-        display: "percent",
-        leftPercent,
-        usedPercent,
-        nextResetTime
-      };
-    }
-
     return {
-      kind: "success",
-      level: "",
-      display: "absolute",
-      remaining,
-      total: limit,
+      leftPercent,
+      usedPercent,
       nextResetTime
     };
   }

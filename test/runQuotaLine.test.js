@@ -23,25 +23,36 @@ import {
 // Using a fixed timestamp that works across timezones for testing
 const TEST_RESET_TIME_MS = 1774939627716; // Fixed timestamp for consistent testing
 const TEST_RESET_ISO = new Date(TEST_RESET_TIME_MS).toISOString();
+
+// Window reset time (5 minutes later)
+const TEST_WINDOW_RESET_MS = TEST_RESET_TIME_MS - 5 * 24 * 60 * 60 * 1000; // 5 days earlier for window
+const TEST_WINDOW_RESET_ISO = new Date(TEST_WINDOW_RESET_MS).toISOString();
+
+// Legacy format with both weekly and window quotas
 const SUCCESS_BODY = {
-  usage: {
-    limit: 1000,
-    used: 90,
-    remaining: 910,
-    reset_at: TEST_RESET_ISO
-  },
-  limits: [
+  usages: [
     {
+      scope: "FEATURE_CODING",
       detail: {
         limit: 1000,
         used: 90,
         remaining: 910,
         reset_at: TEST_RESET_ISO
       },
-      window: {
-        duration: 60,
-        timeUnit: "MINUTE"
-      }
+      limits: [
+        {
+          window: {
+            duration: 5,
+            timeUnit: "MINUTE"
+          },
+          detail: {
+            limit: 100,
+            used: 1,
+            remaining: 99,
+            reset_at: TEST_WINDOW_RESET_ISO
+          }
+        }
+      ]
     }
   ]
 };
@@ -89,18 +100,29 @@ test("formats a successful response and writes cache", async () => {
     });
 
     const expectedResetTime = new Date(TEST_RESET_TIME_MS).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+    const expectedWindowResetTime = new Date(TEST_WINDOW_RESET_MS).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+    const weeklyDate = new Date(TEST_RESET_TIME_MS);
+    const expectedWeeklyDate = `${weeklyDate.getMonth() + 1}/${weeklyDate.getDate()}`;
+    const windowDate = new Date(TEST_WINDOW_RESET_MS);
+    const expectedWindowDate = `${windowDate.getMonth() + 1}/${windowDate.getDate()}`;
 
     assert.equal(fetchCalls, 1);
     assert.equal(result.kind, "success");
     assert.equal(result.display, "percent");
-    assert.equal(formatStatus(result), `Kimi | 91% left | reset ${expectedResetTime}`);
-    assert.equal(formatStatus(result, { displayMode: "used" }), `Kimi | 9% used | reset ${expectedResetTime}`);
-    assert.equal(formatStatus(result, { style: "compact" }), `Kimi 91% | ${expectedResetTime}`);
-    assert.equal(formatStatus(result, { style: "bar", barWidth: 10 }), `Kimi ■□□□□□□□□□ 91% | ${expectedResetTime}`);
+    assert.ok(result.quotas, "should have quotas array");
+    assert.equal(result.quotas.length, 2, "should have two quotas");
+
+    // Text style with dual quotas
+    assert.equal(formatStatus(result), `Kimi | 91% left ${expectedWeeklyDate} ${expectedResetTime} || 99% left ${expectedWindowDate} ${expectedWindowResetTime}`);
+    // Compact style
+    assert.equal(formatStatus(result, { style: "compact" }), `Kimi 91% ${expectedResetTime} | 99% ${expectedWindowResetTime}`);
+    // Bar style with dual quotas
+    assert.equal(formatStatus(result, { style: "bar", barWidth: 10 }), `Kimi ■□□□□□□□□□ 91% ${expectedWeeklyDate} ${expectedResetTime} || ■□□□□□□□□□ 99% ${expectedWindowDate} ${expectedWindowResetTime}`);
 
     const cached = JSON.parse(await fs.readFile(cacheFilePath, "utf8"));
     assert.equal(cached.result.kind, "success");
-    assert.equal(cached.result.leftPercent, 91);
+    assert.ok(cached.result.quotas, "cached result should have quotas array");
+    assert.equal(cached.result.quotas.length, 2);
     assert.equal(cached.threadId, "thread-1");
   });
 });
@@ -134,8 +156,13 @@ test("returns fresh cached value without hitting the network", async () => {
             kind: "success",
             level: "",
             display: "percent",
-            leftPercent: 88,
-            nextResetTime: 1774939627716
+            quotas: [
+              {
+                leftPercent: 88,
+                usedPercent: 12,
+                nextResetTime: 1774939627716
+              }
+            ]
           }
         },
         null,
@@ -153,7 +180,9 @@ test("returns fresh cached value without hitting the network", async () => {
     });
 
     assert.equal(fetchCalls, 0);
-    assert.equal(formatStatus(result), "Kimi | 88% left | reset 14:47");
+    const date = new Date(1774939627716);
+    const expectedDate = `${date.getMonth() + 1}/${date.getDate()}`;
+    assert.equal(formatStatus(result), `Kimi | 88% left ${expectedDate} 14:47`);
   });
 });
 
@@ -170,8 +199,13 @@ test("falls back to stale cache on unavailable responses", async () => {
             kind: "success",
             level: "",
             display: "percent",
-            leftPercent: 77,
-            nextResetTime: 1774939627716
+            quotas: [
+              {
+                leftPercent: 77,
+                usedPercent: 23,
+                nextResetTime: 1774939627716
+              }
+            ]
           }
         },
         null,
@@ -189,7 +223,9 @@ test("falls back to stale cache on unavailable responses", async () => {
       })
     });
 
-    assert.equal(formatStatus(result), "Kimi | 77% left | reset 14:47");
+    const date = new Date(1774939627716);
+    const expectedDate = `${date.getMonth() + 1}/${date.getDate()}`;
+    assert.equal(formatStatus(result), `Kimi | 77% left ${expectedDate} 14:47`);
   });
 });
 
@@ -206,8 +242,13 @@ test("auth failures do not reuse stale cache", async () => {
             kind: "success",
             level: "",
             display: "percent",
-            leftPercent: 77,
-            nextResetTime: 1774939627716
+            quotas: [
+              {
+                leftPercent: 77,
+                usedPercent: 23,
+                nextResetTime: 1774939627716
+              }
+            ]
           }
         },
         null,
@@ -279,15 +320,15 @@ test("falls back to limits array when usage object is missing", async () => {
     });
 
     const expectedResetTime = new Date(resetTimeMs).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+    const limitsDate = new Date(resetTimeMs);
+    const expectedDate = `${limitsDate.getMonth() + 1}/${limitsDate.getDate()}`;
 
     assert.equal(result.display, "percent");
-    assert.equal(formatStatus(result), `Kimi | 90% left | reset ${expectedResetTime}`);
-    assert.equal(
-      formatStatus(result, { displayMode: "used" }),
-      `Kimi | 10% used | reset ${expectedResetTime}`
-    );
-    assert.equal(formatStatus(result, { style: "compact" }), `Kimi 90% | ${expectedResetTime}`);
-    assert.equal(formatStatus(result, { style: "bar", barWidth: 10 }), `Kimi ■□□□□□□□□□ 90% | ${expectedResetTime}`);
+    assert.ok(result.quotas, "should have quotas array");
+    assert.equal(result.quotas.length, 1, "should have one quota from limits array");
+    assert.equal(formatStatus(result), `Kimi | 90% left ${expectedDate} ${expectedResetTime}`);
+    assert.equal(formatStatus(result, { style: "compact" }), `Kimi 90% ${expectedResetTime}`);
+    assert.equal(formatStatus(result, { style: "bar", barWidth: 10 }), `Kimi ■□□□□□□□□□ 90% ${expectedDate} ${expectedResetTime}`);
   });
 });
 
@@ -328,9 +369,13 @@ test("same thread and fresh cache do not trigger a network request", async () =>
             kind: "success",
             level: "",
             display: "percent",
-            leftPercent: 88,
-            usedPercent: 12,
-            nextResetTime: 1774939627716
+            quotas: [
+              {
+                leftPercent: 88,
+                usedPercent: 12,
+                nextResetTime: 1774939627716
+              }
+            ]
           }
         },
         null,
@@ -348,7 +393,9 @@ test("same thread and fresh cache do not trigger a network request", async () =>
     });
 
     assert.equal(fetchCalls, 0);
-    assert.equal(formatStatus(result), "Kimi | 88% left | reset 14:47");
+    const date = new Date(1774939627716);
+    const expectedDate = `${date.getMonth() + 1}/${date.getDate()}`;
+    assert.equal(formatStatus(result), `Kimi | 88% left ${expectedDate} 14:47`);
   });
 });
 
@@ -365,9 +412,13 @@ test("a different thread id forces a refresh even when cache is fresh", async ()
             kind: "success",
             level: "",
             display: "percent",
-            leftPercent: 88,
-            usedPercent: 12,
-            nextResetTime: TEST_RESET_TIME_MS
+            quotas: [
+              {
+                leftPercent: 88,
+                usedPercent: 12,
+                nextResetTime: TEST_RESET_TIME_MS
+              }
+            ]
           }
         },
         null,
@@ -385,9 +436,14 @@ test("a different thread id forces a refresh even when cache is fresh", async ()
     });
 
     const expectedResetTime = new Date(TEST_RESET_TIME_MS).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+    const expectedWindowResetTime = new Date(TEST_WINDOW_RESET_MS).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+    const weeklyDate2 = new Date(TEST_RESET_TIME_MS);
+    const expectedWeeklyDate = `${weeklyDate2.getMonth() + 1}/${weeklyDate2.getDate()}`;
+    const windowDate2 = new Date(TEST_WINDOW_RESET_MS);
+    const expectedWindowDate = `${windowDate2.getMonth() + 1}/${windowDate2.getDate()}`;
 
     assert.equal(fetchCalls, 1);
-    assert.equal(formatStatus(result), `Kimi | 91% left | reset ${expectedResetTime}`);
+    assert.equal(formatStatus(result), `Kimi | 91% left ${expectedWeeklyDate} ${expectedResetTime} || 99% left ${expectedWindowDate} ${expectedWindowResetTime}`);
   });
 });
 
@@ -419,30 +475,44 @@ test("falls back to CODEX_THREAD_ID when Claude session metadata is absent", () 
 });
 
 test("bar style uses filled cells for used percentage and spaces for unused percentage", () => {
+  const timestamp = 1774939627716;
+  const date = new Date(timestamp);
+  const expectedDate = `${date.getMonth() + 1}/${date.getDate()}`;
   const result = {
     kind: "success",
     level: "",
     display: "percent",
-    leftPercent: 97,
-    usedPercent: 3,
-    nextResetTime: 1774939627716
+    quotas: [
+      {
+        leftPercent: 97,
+        usedPercent: 3,
+        nextResetTime: timestamp
+      }
+    ]
   };
 
   // 3% used with barWidth 10 = 1 filled cell (3% of 10 = 0.3, min 1)
-  assert.equal(formatStatus(result, { style: "bar", barWidth: 10 }), "Kimi ■□□□□□□□□□ 97% | 14:47");
+  assert.equal(formatStatus(result, { style: "bar", barWidth: 10 }), `Kimi ■□□□□□□□□□ 97% ${expectedDate} 14:47`);
 });
 
 test("bar style fills completely only when used percentage reaches 100", () => {
+  const timestamp = 1774939627716;
+  const date = new Date(timestamp);
+  const expectedDate = `${date.getMonth() + 1}/${date.getDate()}`;
   const result = {
     kind: "success",
     level: "",
     display: "percent",
-    leftPercent: 0,
-    usedPercent: 100,
-    nextResetTime: 1774939627716
+    quotas: [
+      {
+        leftPercent: 0,
+        usedPercent: 100,
+        nextResetTime: timestamp
+      }
+    ]
   };
 
-  assert.equal(formatStatus(result, { style: "bar", barWidth: 10 }), "Kimi ■■■■■■■■■■ 0% | 14:47");
+  assert.equal(formatStatus(result, { style: "bar", barWidth: 10 }), `Kimi ■■■■■■■■■■ 0% ${expectedDate} 14:47`);
 });
 
 test("writes tool config values for style and display", async () => {

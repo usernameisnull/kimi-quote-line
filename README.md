@@ -15,31 +15,36 @@ It fetches the quota API, caches successful results, and outputs a single line s
 - Force refresh on first session, then cache for 5 minutes
 - Supports three styles: `text`, `compact`, and `bar`
 - Auto-install and uninstall Claude Code status bar configuration
+- Displays both weekly quota and 5-minute window quota with reset dates
 
 ## Display Styles
 
 ### `bar` (Default)
 
+Displays both weekly quota and 5-minute window quota:
+
 ```text
-Kimi ■□□□□□□□□□ 91% | 14:47
+Kimi ■□□□□□□□□□ 94% 4/8 15:41 || ■□□□□□□□□□ 97% 4/4 16:41
 ```
 
 ### `text`
 
 ```text
-Kimi | 91% left | reset 14:47
+Kimi | 94% left 4/8 15:41 || 97% left 4/4 16:41
 ```
 
 ### `compact`
 
 ```text
-Kimi 91% | 14:47
+Kimi 94% 15:41 | 97% 16:41
 ```
 
 Legend:
 
 - `■` = Used
 - `□` = Remaining
+- Left side = Weekly quota (resets on the date shown)
+- Right side = 5-minute window quota (resets hourly)
 
 ## Installation
 
@@ -122,7 +127,9 @@ Optional:
 
 ## Notes
 
-- Displays a single line by default, suitable for bottom status bar
+- Displays quota information by default, suitable for bottom status bar
+- Shows both weekly quota and 5-minute window quota (separated by `||`)
+- Dates are shown as `M/D` format (e.g., `4/8` means April 8th)
 - Shows `Kimi | auth expired` when authentication fails
 - Shows `Kimi | quota unavailable` when API is unavailable
 - `install` won't overwrite existing non-tool `statusLine` by default

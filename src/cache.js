@@ -6,6 +6,14 @@ function isSuccessCacheShape(value) {
     return false;
   }
 
+  // New format with quotas array
+  if (Array.isArray(value.quotas)) {
+    return value.quotas.length > 0 && value.quotas.every(
+      q => Number.isFinite(q.leftPercent) && Number.isFinite(q.nextResetTime)
+    );
+  }
+
+  // Legacy format with single quota
   if (!Number.isFinite(value.nextResetTime)) {
     return false;
   }
