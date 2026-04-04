@@ -1,6 +1,6 @@
 {
   "name": "kimi-quota-line",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Claude Code status line helper for Kimi Code usage quota.",
   "type": "module",
   "license": "MIT",
@@ -23,6 +23,7 @@
     "url": "https://github.com/usernameisnull/kimi-quote-line/issues"
   },
   "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
     "access": "public"
   },
   "files": [

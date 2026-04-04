@@ -54,7 +54,7 @@ Kimi 94% 15:41 | 97% 16:41
 npm install -g .
 ```
 
-npm 发布后安装：
+npm 安装：
 
 ```bash
 npm install -g kimi-quota-line

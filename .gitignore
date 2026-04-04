@@ -3,3 +3,4 @@ coverage/
 *.log
 *.tgz
 .idea
+release-to-npm.md

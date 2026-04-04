@@ -54,7 +54,7 @@ Install from local repository:
 npm install -g .
 ```
 
-Or install from npm (when published):
+Or install from npm:
 
 ```bash
 npm install -g kimi-quota-line
