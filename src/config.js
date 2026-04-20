@@ -39,7 +39,11 @@ function deriveQuotaUrl(baseUrl) {
 
     // Kimi Code platform
     if (parsedBaseUrl.host.includes("api.kimi.com")) {
-      return `${baseUrl.replace(/\/$/, "")}/usages`;
+      const normalized = baseUrl.replace(/\/$/, "");
+      if (normalized.endsWith("/v1")) {
+        return `${normalized}/usages`;
+      }
+      return `${normalized}/v1/usages`;
     }
   } catch {
     return "";

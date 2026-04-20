@@ -133,7 +133,9 @@ async function main() {
     const userConfig = await readToolConfig();
     
     // Claude Code passes env vars via statusLineInput.env
-    const envVars = statusLineInput?.env || process.env;
+    // Merge with process.env so local env vars (e.g. ANTHROPIC_AUTH_TOKEN)
+    // are not lost when Claude Code's injected env is missing them.
+    const envVars = { ...process.env, ...(statusLineInput?.env || {}) };
     const config = {
       ...loadConfig(envVars),
       ...(validateStyle(userConfig.style) ? { style: userConfig.style } : {}),

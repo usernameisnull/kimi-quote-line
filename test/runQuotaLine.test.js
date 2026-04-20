@@ -356,6 +356,16 @@ test("official environment variables take priority and derive the quota URL", ()
   assert.equal(config.threadId, "thread-9");
 });
 
+test("derives quota URL from Kimi base URL without v1 suffix", () => {
+  const config = loadConfig({
+    ANTHROPIC_AUTH_TOKEN: "sk-test-key",
+    ANTHROPIC_BASE_URL: "https://api.kimi.com/coding/",
+    CODEX_THREAD_ID: "thread-9"
+  });
+
+  assert.equal(config.quotaUrl, "https://api.kimi.com/coding/v1/usages");
+});
+
 test("same thread and fresh cache do not trigger a network request", async () => {
   await withTempDir(async (dir) => {
     const cacheFilePath = path.join(dir, "cache.json");
